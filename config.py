@@ -1,0 +1,2 @@
+BOT_TOKEN = "7159540137:AAEU4QGYSKcvs_psDYzNgjzPjaRm8NnUSQA"
+DATABASE_NAME = "football_teams.db"
