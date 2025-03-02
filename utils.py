@@ -12,6 +12,12 @@ def calculate_total_score(player):
         player[10]   # dribbling
     )
 
+def validate_player_data(speed, stamina, shot_power, shot_accuracy, pass_accuracy, defense, dribbling):
+    """Проверяет, что характеристики находятся в диапазоне от 0 до 99."""
+    if not all(0 <= value <= 99 for value in [speed, stamina, shot_power, shot_accuracy, pass_accuracy, defense, dribbling]):
+        raise ValueError("Все характеристики должны быть от 0 до 99.")
+    return True
+
 def split_teams_balanced(players, game_type, balance_threshold=50):
     """Генерация сбалансированных команд с учетом амплуа и характеристик."""
     # Фильтруем игроков, которые играют сегодня

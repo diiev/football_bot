@@ -18,16 +18,16 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
-                speed INTEGER NOT NULL,          # Скорость (0-99)
-                stamina INTEGER NOT NULL,        # Выносливость (0-99)
-                shot_power INTEGER NOT NULL,     # Сила удара (0-99)
-                shot_accuracy INTEGER NOT NULL,  # Точность удара (0-99)
-                pass_accuracy INTEGER NOT NULL,  # Точность пасов (0-99)
-                teamwork TEXT NOT NULL,         # Командная игра (да/нет)
-                defense INTEGER NOT NULL,       # Защита (0-99)
-                dribbling INTEGER NOT NULL,     # Дриблинг (0-99)
-                position TEXT NOT NULL,         # Амплуа (защитник, полузащитник, нападающий)
-                is_playing INTEGER DEFAULT 0    # Играет сегодня (0/1)
+                speed INTEGER NOT NULL,         
+                stamina INTEGER NOT NULL,       
+                shot_power INTEGER NOT NULL,     
+                shot_accuracy INTEGER NOT NULL,  
+                pass_accuracy INTEGER NOT NULL,  
+                teamwork TEXT NOT NULL,         
+                defense INTEGER NOT NULL,      
+                dribbling INTEGER NOT NULL,     
+                position TEXT NOT NULL,         
+                is_playing INTEGER DEFAULT 0    
             )
         """)
         conn.commit()

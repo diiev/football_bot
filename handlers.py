@@ -1,7 +1,7 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from database import get_players, add_player, delete_player, update_player, set_player_playing, get_playing_players
-from utils import calculate_total_score, split_teams_balanced
+from utils import calculate_total_score, split_teams_balanced, validate_player_data
 
 # Глобальные переменные для хранения состояния
 player_to_delete = None
@@ -189,6 +189,97 @@ async def handle_generate_teams(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(str(e))
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {str(e)}")
+
+async def delete_player_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды 'Удалить игрока'."""
+    global player_to_delete
+    keyboard = [["Назад"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Введите имя игрока, которого хотите удалить:",
+        reply_markup=reply_markup
+    )
+
+async def confirm_delete_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик подтверждения удаления игрока."""
+    global player_to_delete
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    if query.data == "delete_yes":
+        delete_player(user_id, player_to_delete)
+        await query.edit_message_text(f"Игрок {player_to_delete} удален!")
+    else:
+        await query.edit_message_text("Удаление отменено.")
+    
+    player_to_delete = None
+
+async def edit_player_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды 'Редактировать игрока'."""
+    keyboard = [["Назад"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Введите данные игрока в формате:\n"
+        "<имя> <скорость> <выносливость> <сила удара> <точность удара> <точность пасов> <командная игра (да/нет)> <защита> <дриблинг> <амплуа (защитник/полузащитник/нападающий)>\n"
+        "Пример: Игрок1 80 70 85 90 75 да 60 80 нападающий",
+        reply_markup=reply_markup
+    )
+
+async def handle_edit_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик редактирования игрока."""
+    user_id = update.message.from_user.id
+    args = update.message.text.split()
+    
+    if len(args) != 10:
+        await update.message.reply_text("Неверный формат. Используйте: <имя> <скорость> <выносливость> <сила удара> <точность удара> <точность пасов> <командная игра (да/нет)> <защита> <дриблинг> <амплуа (защитник/полузащитник/нападающий)>")
+        return
+    
+    name, speed, stamina, shot_power, shot_accuracy, pass_accuracy, teamwork, defense, dribbling, position = args
+    try:
+        speed, stamina, shot_power, shot_accuracy, pass_accuracy, defense, dribbling = map(int, [speed, stamina, shot_power, shot_accuracy, pass_accuracy, defense, dribbling])
+        validate_player_data(speed, stamina, shot_power, shot_accuracy, pass_accuracy, defense, dribbling)
+        
+        update_player(user_id, name, speed, stamina, shot_power, shot_accuracy, pass_accuracy, teamwork, defense, dribbling, position)
+        await update.message.reply_text(f"Игрок {name} обновлен!")
+    except ValueError as e:
+        await update.message.reply_text(str(e))
+
+async def find_player_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды 'Найти игрока'."""
+    keyboard = [["Назад"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Введите имя игрока, которого хотите найти:",
+        reply_markup=reply_markup
+    )
+
+async def handle_find_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик поиска игрока."""
+    user_id = update.message.from_user.id
+    player_name = update.message.text
+    
+    players = get_players(user_id)
+    player = next((p for p in players if p[2] == player_name), None)
+    
+    if not player:
+        await update.message.reply_text(f"Игрок {player_name} не найден.")
+        return
+    
+    message = (
+        f"Имя: {player[2]}\n"
+        f"Скорость: {player[3]}\n"
+        f"Выносливость: {player[4]}\n"
+        f"Сила удара: {player[5]}\n"
+        f"Точность удара: {player[6]}\n"
+        f"Точность пасов: {player[7]}\n"
+        f"Командная игра: {player[8]}\n"
+        f"Защита: {player[9]}\n"
+        f"Дриблинг: {player[10]}\n"
+        f"Амплуа: {player[11]}\n"
+        f"Играет сегодня: {'Да' if player[12] else 'Нет'}\n"
+    )
+    
+    await update.message.reply_text(message)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик текстовых сообщений."""
