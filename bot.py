@@ -1,9 +1,9 @@
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from handlers import start, handle_message, confirm_delete_player, handle_pagination, handle_toggle_playing
 from config import BOT_TOKEN
-from database import init_db
 
 def main():
+    from database import init_db
     init_db()
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -15,3 +15,6 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_toggle_playing, pattern="^toggle_playing_"))
     
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
