@@ -1,5 +1,5 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler
 from database import get_players, add_player, delete_player, update_player, set_player_playing, get_playing_players
 from utils import calculate_total_score, split_teams_balanced, validate_player_data
 
@@ -102,9 +102,15 @@ async def handle_pagination(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def mark_players_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды 'Отметить игроков'."""
-    user_id = update.message.from_user.id
-    players = get_players(user_id)
     
+    if update.message:
+        user_id = update.message.from_user.id  # Если это обычное сообщение
+    elif update.callback_query:
+        user_id = update.callback_query.from_user.id  # Если это callback-запрос
+    else:
+        return  # Неизвестный тип update, игнорируем
+
+    players = get_players(user_id)
     if not players:
         await update.message.reply_text("Игроков пока нет. Добавьте их с помощью 'Добавить игрока'.")
         return
@@ -144,32 +150,29 @@ async def handle_toggle_playing(update: Update, context: ContextTypes.DEFAULT_TY
     # Обновляем сообщение
     await mark_players_handler(update, context)
 
-async def generate_teams_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик команды 'Сгенерировать команды'."""
-    keyboard = [
-        ["5v5", "6v6", "8v8"],
-        ["Назад"]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        "Выберите тип игры:",
-        reply_markup=reply_markup
-    )
+BALANCE_THRESHOLD = range(1)  # Шаг диалога
 
 async def handle_generate_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик выбора типа игры и генерации команд."""
+    """Начинаем процесс генерации команд, запрашивая порог баланса."""
     user_id = update.message.from_user.id
-    game_type = update.message.text
-    
+    context.user_data["user_id"] = user_id  # Сохраняем user_id
+    context.user_data["game_type"] = update.message.text  # Сохраняем тип игры
+
+    await update.message.reply_text("Введите порог баланса (максимальная разница в рейтинге, например, 50):")
+    return BALANCE_THRESHOLD  # Переходим на следующий шаг
+
+async def handle_balance_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатываем ввод порога баланса и создаем команды."""
     try:
-        # Запрашиваем порог баланса
-        await update.message.reply_text("Введите порог баланса (максимальная разница в рейтинге, например, 50):")
-        balance_threshold = int((await context.bot.wait_for("message", timeout=30)).text)
-        
+        balance_threshold = int(update.message.text)
+        context.user_data["balance_threshold"] = balance_threshold  # Сохраняем порог
+
+        user_id = context.user_data["user_id"]
+        game_type = context.user_data["game_type"]
+
         players = get_players(user_id)
         team_a, team_b, goalkeeper_a, goalkeeper_b = split_teams_balanced(players, game_type, balance_threshold)
-        
-        # Формируем сообщение с составом команд
+
         def format_team(team, goalkeeper):
             team_info = "\n".join(
                 f"{player[2]} ({player[12]}) - Рейтинг: {calculate_total_score(player)}"
@@ -178,17 +181,28 @@ async def handle_generate_teams(update: Update, context: ContextTypes.DEFAULT_TY
             if goalkeeper:
                 team_info += f"\nВратарь: {goalkeeper[2]} (защитник) - Рейтинг: {calculate_total_score(goalkeeper)}"
             return team_info
-        
+
         team_a_message = format_team(team_a, goalkeeper_a)
         team_b_message = format_team(team_b, goalkeeper_b)
-        
+
         await update.message.reply_text(
             f"Команда A:\n{team_a_message}\n\nКоманда B:\n{team_b_message}"
         )
-    except ValueError as e:
-        await update.message.reply_text(str(e))
+        return ConversationHandler.END  # Завершаем диалог ✅
+
+    except ValueError:
+        await update.message.reply_text("Пожалуйста, введите число.")
+        return BALANCE_THRESHOLD  # Ожидаем ввод снова
+
     except Exception as e:
         await update.message.reply_text(f"Ошибка: {str(e)}")
+        return ConversationHandler.END  # Закрываем диалог при ошибке
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик отмены диалога."""
+    await update.message.reply_text("Операция отменена.")
+    return ConversationHandler.END
 
 async def delete_player_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды 'Удалить игрока'."""
@@ -290,7 +304,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "Показать игроков":
         await show_players_handler(update, context)
     elif text == "Сгенерировать команды":
-        await generate_teams_handler(update, context)
+        await handle_generate_teams(update, context)
     elif text == "Удалить игрока":
         await delete_player_handler(update, context)
     elif text == "Редактировать игрока":
