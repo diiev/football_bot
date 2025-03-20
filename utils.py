@@ -1,5 +1,25 @@
 import random
+import re
 
+def parse_player_data(data):
+    pattern = re.compile(r'^(\S+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(да|нет)\s+(\d+)\s+(\d+)\s+(защитник|полузащитник|нападающий)$', re.IGNORECASE)
+    match = pattern.match(data)
+    if not match:
+        return None
+    
+    name, speed, stamina, shot_power, shot_accuracy, pass_accuracy, teamwork, defense, dribbling, role = match.groups()
+    return {
+        "name": name,
+        "speed": int(speed),
+        "stamina": int(stamina),
+        "shot_power": int(shot_power),
+        "shot_accuracy": int(shot_accuracy),
+        "pass_accuracy": int(pass_accuracy),
+        "teamwork": teamwork.lower() == "да",
+        "defense": int(defense),
+        "dribbling": int(dribbling),
+        "role": role.lower()
+    }
 def calculate_total_score(player):
     """Рассчитывает общий рейтинг игрока."""
     return (
